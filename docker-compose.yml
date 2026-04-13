@@ -1,0 +1,72 @@
+# Example: AudioMuse RQ worker with Tailscale (same-network Redis/Postgres as typical compose).
+# Set TS_AUTHKEY to a pre-auth key from https://login.tailscale.com/admin/settings/keys
+# Point JELLYFIN_URL / POSTGRES_HOST / REDIS_URL at tailnet hostnames or MagicDNS as needed.
+
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis-data:/data
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-audiomuse}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-audiomusepassword}
+      POSTGRES_DB: ${POSTGRES_DB:-audiomusedb}
+    restart: unless-stopped
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  audiomuse-ai-worker:
+    build: .
+    image: audiomuse-worker-tailscale:local
+    restart: unless-stopped
+    environment:
+      SERVICE_TYPE: worker
+      TZ: ${TZ:-UTC}
+
+      # Tailscale (wrapper). Set TS_AUTHKEY from admin keys, or TS_SKIP=true for local testing without Tailscale.
+      TS_AUTHKEY: ${TS_AUTHKEY:-}
+      TS_SKIP: ${TS_SKIP:-false}
+      TS_HOSTNAME: ${TS_HOSTNAME:-audiomuse-worker}
+      TS_EXTRA_ARGS: ${TS_EXTRA_ARGS:-}
+      TS_STATE_DIR: /var/lib/tailscale
+
+      # AudioMuse / stack (align with upstream deployment/.env)
+      MEDIASERVER_TYPE: ${MEDIASERVER_TYPE:-jellyfin}
+      JELLYFIN_USER_ID: ${JELLYFIN_USER_ID:-}
+      JELLYFIN_TOKEN: ${JELLYFIN_TOKEN:-}
+      JELLYFIN_URL: ${JELLYFIN_URL:-}
+      POSTGRES_USER: ${POSTGRES_USER:-audiomuse}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-audiomusepassword}
+      POSTGRES_DB: ${POSTGRES_DB:-audiomusedb}
+      POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      AI_MODEL_PROVIDER: ${AI_MODEL_PROVIDER:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_SERVER_URL: ${OPENAI_SERVER_URL:-}
+      OPENAI_MODEL_NAME: ${OPENAI_MODEL_NAME:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      MISTRAL_API_KEY: ${MISTRAL_API_KEY:-}
+      CLAP_ENABLED: ${CLAP_ENABLED:-true}
+      TEMP_DIR: /app/temp_audio
+      API_TOKEN: ${API_TOKEN:-}
+      AUDIOMUSE_USER: ${AUDIOMUSE_USER:-}
+      AUDIOMUSE_PASSWORD: ${AUDIOMUSE_PASSWORD:-}
+      JWT_SECRET: ${JWT_SECRET:-}
+      AUTH_ENABLED: ${AUTH_ENABLED:-true}
+    volumes:
+      - temp-audio-worker:/app/temp_audio
+      - tailscale-state:/var/lib/tailscale
+    depends_on:
+      - redis
+      - postgres
+
+volumes:
+  redis-data:
+  postgres-data:
+  temp-audio-worker:
+  tailscale-state:
