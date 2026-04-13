@@ -40,8 +40,9 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Docker metadata (tags and labels)
-        id: meta
+      # --- CPU (upstream :latest) -------------------------------------------------
+      - name: Docker metadata (CPU)
+        id: meta_cpu
         uses: docker/metadata-action@v5
         with:
           images: ${{ steps.image.outputs.name }}
@@ -54,13 +55,40 @@ jobs:
           flavor: |
             latest=${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
 
-      - name: Build and push
+      - name: Build and push (CPU)
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile
           push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          tags: ${{ steps.meta_cpu.outputs.tags }}
+          labels: ${{ steps.meta_cpu.outputs.labels }}
+          cache-from: type=gha,scope=cpu
+          cache-to: type=gha,mode=max,scope=cpu
+
+      # --- NVIDIA (upstream :latest-nvidia) ---------------------------------------
+      - name: Docker metadata (NVIDIA)
+        id: meta_nvidia
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.image.outputs.name }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix=sha-
+          flavor: |
+            latest=${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+            suffix=-nvidia
+
+      - name: Build and push (NVIDIA)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile.nvidia
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta_nvidia.outputs.tags }}
+          labels: ${{ steps.meta_nvidia.outputs.labels }}
+          cache-from: type=gha,scope=nvidia
+          cache-to: type=gha,mode=max,scope=nvidia
